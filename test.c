@@ -18,7 +18,7 @@ int main(int ac, char **av)
 		}
 		
 		int i;
-		for (i = 0; i < size; size += 64)
+		for (i = 0; i < size; i += 64)
 			use_value(((volatile char *)map)[i]);
 
 		spooky_init(&state, 0x123456789abcdef, 0xfedcba987654321);
