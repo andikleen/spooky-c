@@ -1,59 +1,51 @@
 //
-// Spooky: a 128-bit noncryptographic hash function
+// SpookyHash: a 128-bit noncryptographic hash function
 // By Bob Jenkins, public domain
-//   Oct 31 2010: alpha, framework + SpookyMix appears right
-//   Oct 31 2011: beta, finished all the pieces, passes all the tests
+//   Oct 31 2010: alpha, framework + SpookyHash::Mix appears right
+//   Oct 31 2011: alpha again, Mix only good to 2^^69 but rest appears right
+//   Dec 31 2011: beta, improved Mix, tested it for 2-bit deltas
+//   Feb  2 2012: production, same bits as beta
+//   Feb  5 2012: adjusted definitions of uint* to be more portable
+//   Mar 30 2012: 3 bytes/cycle, not 4.  Alpha was 4 but wasn't thorough enough.
 // 
-// 4 bytes/cycle for long messages.  Reasonably fast for short messages.
+// Up to 3 bytes/cycle for long messages.  Reasonably fast for short messages.
 // All 1 or 2 bit deltas achieve avalanche within 1% bias per output bit.
 //
 // This was developed for and tested on 64-bit x86-compatible processors.
 // It assumes the processor is little-endian.  There is a macro
 // controlling whether unaligned reads are allowed (by default they are).
+// This should be an equally good hash on big-endian machines, but it will
+// compute different results on them than on little-endian machines.
 //
-// See http://burtleburtle.net/bob/hash/spooky.html for more description.
+// Google's CityHash has similar specs to SpookyHash, and CityHash is faster
+// on some platforms.  MD4 and MD5 also have similar specs, but they are orders
+// of magnitude slower.  CRCs are two or more times slower, but unlike 
+// SpookyHash, they have nice math for combining the CRCs of pieces to form 
+// the CRCs of wholes.  There are also cryptographic hashes, but those are even 
+// slower than MD5.
 //
 
 #include <stddef.h>
-#include <memory.h>
 
-typedef  unsigned long long uint64;
-typedef  unsigned long      uint32;
-typedef  unsigned short     uint16;
-typedef  unsigned char      uint8;
+#ifdef _MSC_VER
+# define INLINE __forceinline
+  typedef  unsigned __int64 uint64;
+  typedef  unsigned __int32 uint32;
+  typedef  unsigned __int16 uint16;
+  typedef  unsigned __int8  uint8;
+#else
+# include <stdint.h>
+# define INLINE inline
+  typedef  uint64_t  uint64;
+  typedef  uint32_t  uint32;
+  typedef  uint16_t  uint16;
+  typedef  uint8_t   uint8;
+#endif
 
 
-
-class Spooky
+class SpookyHash
 {
 public:
-    //
-    // Init: initialize the context of a Spooky hash
-    //
-    void Init(
-        uint64 hash1,       // seed1
-        uint64 hash2);      // seed2
-    
-    //
-    // Update: add a piece of a message to a Spooky state
-    //
-    void Update(
-        const void *message,  // message fragment
-        size_t length);       // length of message fragment in bytes
-
-
-    //
-    // Final: compute the hash for the current Spooky state
-    //
-    // This does not modify the state; you can keep updating it afterward
-    //
-    // The result is the same as if SpookyHash() had been called with
-    // all the pieces concatenated into one message.
-    //
-    void Final(
-        uint64 *hash1,    // first 64 bits of output hash
-        uint64 *hash2);   // second 64 bits of output hash
-
     //
     // SpookyHash: hash a single message in one call, produce 128-bit output
     //
@@ -64,7 +56,7 @@ public:
         uint64 *hash2);       // in/out: in seed 2, out hash value 2
 
     //
-    // SpookyHash: hash a single message in one call, return 64-bit output
+    // Hash64: hash a single message in one call, return 64-bit output
     //
     static uint64 Hash64(
         const void *message,  // message to hash
@@ -77,7 +69,7 @@ public:
     }
 
     //
-    // SpookyHash: hash a single message in one call, produce 32-bit output
+    // Hash32: hash a single message in one call, produce 32-bit output
     //
     static uint32 Hash32(
         const void *message,  // message to hash
@@ -87,6 +79,41 @@ public:
         uint64 hash1 = seed, hash2 = seed;
         Hash128(message, length, &hash1, &hash2);
         return (uint32)hash1;
+    }
+
+    //
+    // Init: initialize the context of a SpookyHash
+    //
+    void Init(
+        uint64 seed1,       // any 64-bit value will do, including 0
+        uint64 seed2);      // different seeds produce independent hashes
+    
+    //
+    // Update: add a piece of a message to a SpookyHash state
+    //
+    void Update(
+        const void *message,  // message fragment
+        size_t length);       // length of message fragment in bytes
+
+
+    //
+    // Final: compute the hash for the current SpookyHash state
+    //
+    // This does not modify the state; you can keep updating it afterward
+    //
+    // The result is the same as if SpookyHash() had been called with
+    // all the pieces concatenated into one message.
+    //
+    void Final(
+        uint64 *hash1,    // out only: first 64 bits of hash value.
+        uint64 *hash2);   // out only: second 64 bits of hash value.
+
+    //
+    // left rotate a 64-bit value by k bytes
+    //
+    static INLINE uint64 Rot64(uint64 x, int k)
+    {
+        return (x << k) | (x >> (64 - k));
     }
 
     //
@@ -100,41 +127,26 @@ public:
     //   Where "differ" means xor or subtraction
     //   And the base value is random
     //   When run forward or backwards one Mix
-    //   The internal state will differ by an average of 
-    //     72 bits for one pair (vs 64, for 128 bits of entropy)
-    //     103 bits for two pairs (vs 96)
-    //     125 bits for three pairs (vs 112)
-    //     141 bits for four pairs (vs 120)
-    //     152 bits for five pairs (vs 124)
-    //     160 bits for six pairs (vs 126)
+    // I tried 3 pairs of each; they all differed by at least 212 bits.
     //
-    static inline void Mix(
+    static INLINE void Mix(
         const uint64 *data, 
-        uint64 &h0,
-        uint64 &h1,
-        uint64 &h2,
-        uint64 &h3,
-        uint64 &h4,
-        uint64 &h5,
-        uint64 &h6,
-        uint64 &h7,
-        uint64 &h8,
-        uint64 &h9,
-        uint64 &h10,
-        uint64 &h11)
+        uint64 &s0, uint64 &s1, uint64 &s2, uint64 &s3,
+        uint64 &s4, uint64 &s5, uint64 &s6, uint64 &s7,
+        uint64 &s8, uint64 &s9, uint64 &s10,uint64 &s11)
     {
-        h0 +=(data)[0];  h11=Rot64(h11,32); h9 ^=h1;  h11+=h10; h1 +=h10;
-        h1 +=(data)[1];  h0 =Rot64(h0, 41); h10^=h2;  h0 +=h11; h2 +=h11;
-        h2 +=(data)[2];  h1 =Rot64(h1, 12); h11^=h3;  h1 +=h0;  h3 +=h0;
-        h3 +=(data)[3];  h2 =Rot64(h2, 24); h0 ^=h4;  h2 +=h1;  h4 +=h1;
-        h4 +=(data)[4];  h3 =Rot64(h3, 8);  h1 ^=h5;  h3 +=h2;  h5 +=h2;
-        h5 +=(data)[5];  h4 =Rot64(h4, 42); h2 ^=h6;  h4 +=h3;  h6 +=h3;
-        h6 +=(data)[6];  h5 =Rot64(h5, 32); h3 ^=h7;  h5 +=h4;  h7 +=h4;
-        h7 +=(data)[7];  h6 =Rot64(h6, 13); h4 ^=h8;  h6 +=h5;  h8 +=h5;
-        h8 +=(data)[8];  h7 =Rot64(h7, 30); h5 ^=h9;  h7 +=h6;  h9 +=h6;
-        h9 +=(data)[9];  h8 =Rot64(h8, 20); h6 ^=h10; h8 +=h7;  h10+=h7;
-        h10+=(data)[10]; h9 =Rot64(h9, 47); h7 ^=h11; h9 +=h8;  h11+=h8;
-        h11+=(data)[11]; h10=Rot64(h10,16); h8 ^=h0;  h10+=h9;  h0 +=h9;
+      s0 += data[0];    s2 ^= s10;    s11 ^= s0;    s0 = Rot64(s0,11);    s11 += s1;
+      s1 += data[1];    s3 ^= s11;    s0 ^= s1;    s1 = Rot64(s1,32);    s0 += s2;
+      s2 += data[2];    s4 ^= s0;    s1 ^= s2;    s2 = Rot64(s2,43);    s1 += s3;
+      s3 += data[3];    s5 ^= s1;    s2 ^= s3;    s3 = Rot64(s3,31);    s2 += s4;
+      s4 += data[4];    s6 ^= s2;    s3 ^= s4;    s4 = Rot64(s4,17);    s3 += s5;
+      s5 += data[5];    s7 ^= s3;    s4 ^= s5;    s5 = Rot64(s5,28);    s4 += s6;
+      s6 += data[6];    s8 ^= s4;    s5 ^= s6;    s6 = Rot64(s6,39);    s5 += s7;
+      s7 += data[7];    s9 ^= s5;    s6 ^= s7;    s7 = Rot64(s7,57);    s6 += s8;
+      s8 += data[8];    s10 ^= s6;    s7 ^= s8;    s8 = Rot64(s8,55);    s7 += s9;
+      s9 += data[9];    s11 ^= s7;    s8 ^= s9;    s9 = Rot64(s9,54);    s8 += s10;
+      s10 += data[10];    s0 ^= s8;    s9 ^= s10;    s10 = Rot64(s10,22);    s9 += s11;
+      s11 += data[11];    s1 ^= s9;    s10 ^= s11;    s11 = Rot64(s11,46);    s10 += s0;
     }
 
     //
@@ -145,57 +157,46 @@ public:
     // And the base value is random, or a counting value starting at that bit
     // The final result will have each bit of h0, h1 flip
     // For every input bit,
-    // with probability 50 +- .3% (it may be better than that)
+    // with probability 50 +- .3%
     // For every pair of input bits,
-    // with probability 50 +- 3% (it may be better than that)
+    // with probability 50 +- 3%
     //
     // This does not rely on the last Mix() call having already mixed some.
-    // It is likely a faster End() could be found if that fact were used.
+    // Two iterations was almost good enough for a 64-bit result, but a
+    // 128-bit result is reported, so End() does three iterations.
     //
-    static inline void End(
-        uint64 &h0,
-        uint64 &h1,
-        uint64 &h2,
-        uint64 &h3,
-        uint64 &h4,
-        uint64 &h5,
-        uint64 &h6,
-        uint64 &h7,
-        uint64 &h8,
-        uint64 &h9,
-        uint64 &h10,
-        uint64 &h11)
+    static INLINE void EndPartial(
+        uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3,
+        uint64 &h4, uint64 &h5, uint64 &h6, uint64 &h7, 
+        uint64 &h8, uint64 &h9, uint64 &h10,uint64 &h11)
     {
-        // once
-      h0 = Rot64(h0,29);    h2 ^= h11;   h0 += h2;
-      h1 = Rot64(h1,52);    h3 ^= h0;    h1 += h3;
-      h2 = Rot64(h2,31);    h4 ^= h1;    h2 += h4;
-      h3 = Rot64(h3,43);    h5 ^= h2;    h3 += h5;
-      h4 = Rot64(h4,56);    h6 ^= h3;    h4 += h6;
-      h5 = Rot64(h5,34);    h7 ^= h4;    h5 += h7;
-      h6 = Rot64(h6,21);    h8 ^= h5;    h6 += h8;
-      h7 = Rot64(h7,17);    h9 ^= h6;    h7 += h9;
-      h8 = Rot64(h8,44);    h10 ^= h7;   h8 += h10;
-      h9 = Rot64(h9,38);    h11 ^= h8;   h9 += h11;
-      h10 = Rot64(h10,50);  h0 ^= h9;    h10 += h0;
-      h11 = Rot64(h11,50);  h1 ^= h10;   h11 += h1;
+        h11+= h1;    h2 ^= h11;   h1 = Rot64(h1,44);
+	h0 += h2;    h3 ^= h0;    h2 = Rot64(h2,15);
+	h1 += h3;    h4 ^= h1;    h3 = Rot64(h3,34);
+	h2 += h4;    h5 ^= h2;    h4 = Rot64(h4,21);
+	h3 += h5;    h6 ^= h3;    h5 = Rot64(h5,38);
+	h4 += h6;    h7 ^= h4;    h6 = Rot64(h6,33);
+	h5 += h7;    h8 ^= h5;    h7 = Rot64(h7,10);
+	h6 += h8;    h9 ^= h6;    h8 = Rot64(h8,13);
+	h7 += h9;    h10^= h7;    h9 = Rot64(h9,38);
+	h8 += h10;   h11^= h8;    h10= Rot64(h10,53);
+	h9 += h11;   h0 ^= h9;    h11= Rot64(h11,42);
+	h10+= h0;    h1 ^= h10;   h0 = Rot64(h0,54);
+    }
 
-        // twice
-      h0 = Rot64(h0,29);    h2 ^= h11;   h0 += h2;
-      h1 = Rot64(h1,52);    h3 ^= h0;    h1 += h3;
-      h2 = Rot64(h2,31);    h4 ^= h1;    h2 += h4;
-      h3 = Rot64(h3,43);    h5 ^= h2;    h3 += h5;
-      h4 = Rot64(h4,56);    h6 ^= h3;    h4 += h6;
-      h5 = Rot64(h5,34);    h7 ^= h4;    h5 += h7;
-      h6 = Rot64(h6,21);    h8 ^= h5;    h6 += h8;
-      h7 = Rot64(h7,17);    h9 ^= h6;    h7 += h9;
-      h8 = Rot64(h8,44);    h10 ^= h7;   h8 += h10;
-      h9 = Rot64(h9,38);    h11 ^= h8;   h9 += h11;
-      h10 = Rot64(h10,50);  h0 ^= h9;    h10 += h0;
-      h11 = Rot64(h11,50);  h1 ^= h10;   h11 += h1;
+    static INLINE void End(
+        uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3,
+        uint64 &h4, uint64 &h5, uint64 &h6, uint64 &h7, 
+        uint64 &h8, uint64 &h9, uint64 &h10,uint64 &h11)
+    {
+        EndPartial(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+        EndPartial(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+        EndPartial(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
     }
 
     //
+    // The goal is for each bit of the input to expand into 128 bits of 
+    //   apparent entropy before it is fully overwritten.
     // n trials both set and cleared at least m bits of h0 h1 h2 h3
     //   n: 2   m: 29
     //   n: 3   m: 46
@@ -205,15 +206,10 @@ public:
     //   n: 7   m: 152
     // when run forwards or backwards
     // for all 1-bit and 2-bit diffs
-    // with both xor and subtraction defining diffs
+    // with diffs defined by either xor or subtraction
     // with a base of all zeros plus a counter, or plus another bit, or random
-    // I added it up; that appears to imply 128 bits of entropy.
     //
-    static inline void ShortMix(
-        uint64 &h0,
-        uint64 &h1,
-        uint64 &h2,
-        uint64 &h3)
+    static INLINE void ShortMix(uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3)
     {
         h2 = Rot64(h2,50);  h2 += h3;  h0 ^= h2;
         h3 = Rot64(h3,52);  h3 += h0;  h1 ^= h3;
@@ -241,42 +237,30 @@ public:
     // For every pair of input bits,
     // with probability 50 +- .75% (the worst case is approximately that)
     //
-    static inline void ShortEnd(
-        uint64 &h0,
-        uint64 &h1,
-        uint64 &h2,
-        uint64 &h3)
+    static INLINE void ShortEnd(uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3)
     {
         h3 ^= h2;  h2 = Rot64(h2,15);  h3 += h2;
         h0 ^= h3;  h3 = Rot64(h3,52);  h0 += h3;
         h1 ^= h0;  h0 = Rot64(h0,26);  h1 += h0;
         h2 ^= h1;  h1 = Rot64(h1,51);  h2 += h1;
         h3 ^= h2;  h2 = Rot64(h2,28);  h3 += h2;
-        h0 ^= h3;  h3 = Rot64(h3,9);  h0 += h3;
-        h1 ^= h0;  h0 = Rot64(h0,47);   h1 += h0;
+        h0 ^= h3;  h3 = Rot64(h3,9);   h0 += h3;
+        h1 ^= h0;  h0 = Rot64(h0,47);  h1 += h0;
         h2 ^= h1;  h1 = Rot64(h1,54);  h2 += h1;
         h3 ^= h2;  h2 = Rot64(h2,32);  h3 += h2;
         h0 ^= h3;  h3 = Rot64(h3,25);  h0 += h3;
         h1 ^= h0;  h0 = Rot64(h0,63);  h1 += h0;
     }
     
-    //
-    // left rotate a 64-bit value by k bytes
-    //
-    static inline uint64 Rot64(uint64 x, int k)
-    {
-        return (x << k) | (x >> (64 - k));
-    }
-
 private:
 
     //
-    // ShortHash is used for messages under 96 bytes in length
-    // ShortHash has a low startup cost, the normal mode is good for long
-    // keys, the cost crossover is at about 96 bytes.  The two modes were
+    // Short is used for messages under 192 bytes in length
+    // Short has a low startup cost, the normal mode is good for long
+    // keys, the cost crossover is at about 192 bytes.  The two modes were
     // held to the same quality bar.
     // 
-    static void ShortHash(
+    static void Short(
         const void *message,
         size_t length,
         uint64 *hash1,
@@ -285,8 +269,11 @@ private:
     // number of uint64's in internal state
     static const size_t sc_numVars = 12;
 
-    // size of internal state, in bytes
+    // size of the internal state
     static const size_t sc_blockSize = sc_numVars*8;
+
+    // size of buffer of unhashed data, in bytes
+    static const size_t sc_bufSize = 2*sc_blockSize;
 
     //
     // sc_const: a constant which:
@@ -297,11 +284,10 @@ private:
     //
     static const uint64 sc_const = 0xdeadbeefdeadbeefLL;
 
-    uint64 m_data[sc_numVars];   // unhashed data, for partial messages
+    uint64 m_data[2*sc_numVars];   // unhashed data, for partial messages
     uint64 m_state[sc_numVars];  // internal state of the hash
     size_t m_length;             // total length of the input so far
     uint8  m_remainder;          // length of unhashed data stashed in m_data
 };
-
 
 
