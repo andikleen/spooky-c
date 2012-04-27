@@ -1,10 +1,10 @@
-CFLAGS := -g -O2 -Wall
+CFLAGS := -O2 -Wall -Wextra -lrt
 
-OBJ := spooky-c.o test.o map.o
+OBJ := spooky-c.o
 
-all: test
+all: testspooky-c
 
-test: ${OBJ}
+testspooky-c: ${OBJ}
 
 clean:
-	rm -f ${OBJ} test
+	rm -f ${OBJ} testspooky-c
