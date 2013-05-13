@@ -1,3 +1,5 @@
+![spooky-c] (http://halobates.de/spooky-c.png)
+
 This is a C version of Bob Jenkin's spooky hash. The only advantage over
 Bob's original version is that it is in C, not C++ and comes with
 some test and benchmark code.
