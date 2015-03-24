@@ -1,0 +1,11 @@
+To install:
+
+    $ autoreconf -i
+    $ ./configure
+    $ make
+
+...optionally:
+
+    # make install
+
+That will build spooky-c as a shared and static library.
