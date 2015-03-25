@@ -28,7 +28,7 @@ struct random_vector
 	uint64_t d;
 };
 
-inline uint64_t random_value(struct random_vector *m)
+static inline uint64_t random_value(struct random_vector *m)
 {
 	uint64_t e = m->a - rot64(m->b, 23);
 	m->a = m->b ^ rot64(m->c, 16);
@@ -39,7 +39,7 @@ inline uint64_t random_value(struct random_vector *m)
 	return m->d;
 }
 
-inline void random_init(struct random_vector *m, uint64_t seed)
+static inline void random_init(struct random_vector *m, uint64_t seed)
 {
 	int i;
 	m->a = 0xdeadbeef;
