@@ -11,15 +11,29 @@
 
 //   Assumes little endian ness. Caller has to check this case.
 
+/*
+ * If this is an autoconf build, then use the unaligned access autoconf test to
+ * determine this. Otherwise, fall back on using the arch macros provided by
+ * the compiler.
+ */
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#  ifndef HAVE_ALIGNED_ACCESS_REQUIRED
+#     define ALLOW_UNALIGNED_READS 1
+#  else
+#     define ALLOW_UNALIGNED_READS 0
+#  endif
+#else
+#  if defined(__i386__) || defined(__x86_64__) // add more architectures here
+#     define ALLOW_UNALIGNED_READS 1
+#  else
+#     define ALLOW_UNALIGNED_READS 0
+#  endif
+#endif /* HAVE_CONFIG_H */
+
 #include <memory.h>
 
 #include "spooky-c.h"
-
-#if defined(__i386__) || defined(__x86_64__) // add more architectures here
-#define ALLOW_UNALIGNED_READS 1
-#else
-#define ALLOW_UNALIGNED_READS 0
-#endif
 
 // SC_CONST: a constant which:
 //  * is not zero
