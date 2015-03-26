@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([spooky-c], [1.0.0], [https://github.com/andikleen/spooky-c])
-AM_INIT_AUTOMAKE([foreign])
+AC_INIT([spooky-c],[1.0.0],[https://github.com/andikleen/spooky-c])
+#AM_INIT_AUTOMAKE([foreign])
 
 AC_CONFIG_SRCDIR([spooky-c.h])
 AC_CONFIG_HEADERS([config.h])
