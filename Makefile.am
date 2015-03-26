@@ -10,4 +10,6 @@ testspooky_c_LDADD = -lrt libspooky-c.la
 
 include_HEADERS = spooky-c.h
 
+EXTRA_DIST = README.md
+
 TESTS = testspooky-c
