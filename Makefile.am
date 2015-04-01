@@ -13,3 +13,9 @@ include_HEADERS = spooky-c.h
 EXTRA_DIST = README.md
 
 TESTS = testspooky-c
+
+man3_MANS = spooky_hash128.3
+
+install-data-hook:
+	$(LN_S) spooky_hash128.3 $(DESTDIR)$(man3dir)/spooky_hash32.3
+	$(LN_S) spooky_hash128.3 $(DESTDIR)$(man3dir)/spooky_hash64.3
