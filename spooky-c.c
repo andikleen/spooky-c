@@ -1,7 +1,21 @@
+/*
+ * Written in 2011 by Andi Kleen <andi@firstfloor.org>
+ * Updated in 2012 by Ziga Zupanec <ziga.zupanec@gmail.com>
+ *
+ * To the extent possible under law, the author(s) have dedicated all
+ * copyright and related and neighboring rights to this software to the public
+ * domain worldwide. This software is distributed without any warranty.
+ *
+ * You should have received a copy of the CC0 Public Domain Dedication along
+ * with this software.
+ *
+ * If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
+ */
+
 // A C version of Bob Jenkins' spooky hash
 // Spooky Hash
 // A 128-bit noncryptographic hash, for checksums and table lookup
-// By Bob Jenkins.  Public domain.
+// By Bob Jenkins whose original work was marked public domain.
 //   Oct 31 2010: published framework, disclaimer ShortHash isn't right
 //   Nov 7 2010: disabled ShortHash
 //   Oct 11 2011: C version ported by Andi Kleen (andikleen@github)
