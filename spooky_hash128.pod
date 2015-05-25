@@ -1,0 +1,82 @@
+# turn into a manpage with the following command:
+#
+# pod2man -s 3 -c '' -r '' --stderr spooky_hash128.pod > spooky_hash128.3
+#
+
+=head1 NAME
+
+spooky_hash128 - generate a "spooky" hash of an arbitrary blob of data
+
+=head1 SYNOPSIS
+
+#include <spooky-c.h>
+
+void spooky_hash128(const void *message, size_t len, uint64_t *hash1, uint64_t *hash2);
+
+uint64_t spooky_hash64(const void *message, size_t len, uint64_t seed);
+
+uint32_t spooky_hash32(const void *message, size_t len, uint32_t seed);
+
+=head1 DESCRIPTION
+
+Quoting from Bob Jenkins' web page (inventor of the spooky hash
+function):
+
+"SpookyHash is a public domain noncryptographic hash function producing
+well-distributed 128-bit hash values for byte arrays of any length."
+
+It can also produce 64-bit and 32-bit hash values too, by simply
+discarding the upper bits of the returned hash value. B<spooky_hash32>
+and B<spooky_hash64> are wrappers around B<spooky_hash128> that do
+this discarding.
+
+The B<message> is a pointer to the stream of bytes to be hashed. B<len>
+is the length of B<message>. B<seed> allows the function to generate
+different hashes for the same key.
+
+B<spooky_hash128> also accepts seed values in B<hash1> and B<hash2>. Those
+values will be overwritten with the actual hash results on return.
+
+=head1 RETURN VALUE
+
+B<spooky_hash64> and B<spooky_hash32> return the hash value directly.
+B<spooky_hash128> is a void return function. It overwrites the two 64-bit
+integers that B<hash1> and B<hash2> on return. These functions never return
+errors, only hash values.
+
+=head1 NOTES
+
+The original code was written in C++. The spooky-c library is a
+reimplementation of the hash function in C. It's quite fast on 64-bit
+hardware.
+
+There are some caveats with the SpookyHash function:
+
+=over
+
+=item
+
+It was written for little-endian machines. It will run and work on
+big-endian machines as well, but it will produce different results. Do
+not use these functions if you plan to distribute these hashes in a
+mixed endianness environment.
+
+=item
+
+It is optimized for 64-bit machines that can do unaligned reads.
+It will work on 32-bit hardware and on machines that require aligned
+reads, but it won't perform as well on that hardware. You may want to
+consider a different hash function in that situation.
+
+=back
+
+=head1 SEE ALSO
+
+Bob Jenkins' webpage on SpookyHash: <http://www.burtleburtle.net/bob/hash/spooky.html>
+
+=head1 AUTHORS
+
+Bob Jenkins <bob_jenkins@burtleburtle.net> invented the SpookyHash
+algorithm and wrote the original C++ implementation. The C implementation
+(spooky-c) was written by Andi Kleen <andi@firstfloor.org>. This
+manpage was authored by Jeff Layton <jlayton@poochiereds.net>.
