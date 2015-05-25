@@ -8,6 +8,13 @@ This is a very competitive hash function, but is somewhat unportable
 (64bit little endian only). It's more portable than some of the 
 contenders like CityHash.
 
+Building:
+spooky-c.c is a simple C file that you can copy into your project.
+If you want to build a shared library you can use autoconf
+(Run autoconf ; then ./configure )
+If you just want to build the test programs you can also use
+Makefile.simple (make -f Makefile.simple)
+
 Quoting Bobs original description:
 
  SpookyHash: a 128-bit noncryptographic hash function
