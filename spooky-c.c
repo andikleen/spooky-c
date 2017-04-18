@@ -34,8 +34,13 @@
 //   Oct 31 2011: replace End, ShortMix, ShortEnd, enable ShortHash again
 //   Apr 10 2012: buffer overflow on platforms without unaligned reads
 //   Apr 27 2012: C version updated by Ziga Zupanec ziga.zupanec@gmail.com (agiz@github)
+//   Update to spooky V2: d = should be d += in short hash, and remove extra mix from long hash
+//   (note results have changed from this change)
 
 //   Assumes little endian ness. Caller has to check this case.
+//   According to Bob it should work on LE too, but just give different results.
+
+
 
 /*
  * If this is an autoconf build, then use the unaligned access autoconf test to
@@ -285,7 +290,7 @@ void spooky_shorthash
 	}
 
 	// Handle the last 0..15 bytes, and its length
-	d = ((uint64_t)length) << 56;
+	d += ((uint64_t)length) << 56;
 	switch (remainder)
 	{
 		case 15:
@@ -560,7 +565,6 @@ void spooky_hash128
 	memcpy(buf, endp, remainder);
 	memset(((uint8_t *)buf)+remainder, 0, SC_BLOCKSIZE-remainder);
 	((uint8_t *)buf)[SC_BLOCKSIZE-1] = remainder;
-	mix(buf, &h0 , &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
 
 	// do some final mixing
 	end(&h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
